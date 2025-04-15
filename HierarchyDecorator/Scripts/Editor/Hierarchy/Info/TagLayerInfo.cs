@@ -5,242 +5,275 @@ using UnityEditorInternal;
 
 namespace HierarchyDecorator
 {
-    public class TagLayerInfo : HierarchyInfo
-    {
-        private const int LABEL_GRID_SIZE = 3;
+	public class TagLayerInfo : HierarchyInfo
+	{
+		private const int LABEL_GRID_SIZE = 3;
 
-        // --- Settings
+		// --- Settings
 
-        private bool tagEnabled;
-        private bool layerEnabled;
+		private bool tagEnabled;
+		private bool layerEnabled;
 
-        private bool setChildLayers;
+		private bool setChildLayers;
 
-        private bool isVertical;
-        private bool tagFirst;
+		private bool isVertical;
+		private bool tagFirst;
 
-        private bool bothShown => tagEnabled && layerEnabled;
+		private bool bothShown => tagEnabled && layerEnabled;
 
-        // --- Methods
+		// --- Methods
 
-        protected override void OnDrawInit(HierarchyItem item, Settings settings)
-        {
-            setChildLayers = settings.globalData.applyChildLayers;
+		protected override void OnDrawInit(HierarchyItem item, Settings settings)
+		{
+			setChildLayers = settings.globalData.applyChildLayers;
 
-            TagLayerLayout layout = settings.globalData.tagLayerLayout;
-            isVertical = layout == TagLayerLayout.TagAbove || layout == TagLayerLayout.LayerAbove;
-            tagFirst = layout == TagLayerLayout.TagInFront;
-        }
+			TagLayerLayout layout = settings.globalData.tagLayerLayout;
+			isVertical = layout == TagLayerLayout.TagAbove || layout == TagLayerLayout.LayerAbove;
+			tagFirst = layout == TagLayerLayout.TagInFront;
+		}
 
-        protected override bool DrawerIsEnabled(HierarchyItem item, Settings settings)
-        {
-            tagEnabled = settings.globalData.showTags;
-            layerEnabled = settings.globalData.showLayers;
+		protected override bool DrawerIsEnabled(HierarchyItem item, Settings settings)
+		{
+			tagEnabled = settings.globalData.showTags;
+			layerEnabled = settings.globalData.showLayers;
 
-            if (settings.styleData.HasStyle(item.DisplayName))
-            {
-                tagEnabled &= settings.styleData.displayTags;
-                layerEnabled &= settings.styleData.displayLayers;
-            }
+			if (settings.styleData.HasStyle(item.DisplayName))
+			{
+				tagEnabled &= settings.styleData.displayTags;
+				layerEnabled &= settings.styleData.displayLayers;
+			}
 
-            return tagEnabled || layerEnabled;
-        }
+			return tagEnabled || layerEnabled;
+		}
 
-        protected override void DrawInfo(Rect rect, HierarchyItem item, Settings settings)
-        {
-            if (tagEnabled)
-            {
-                DrawTag(rect, item.GameObject, settings.globalData.tagLayerLayout);
-            }
+		protected override void DrawInfo(Rect rect, HierarchyItem item, Settings settings)
+		{
+			if (tagEnabled)
+			{
+				DrawTag(rect, item.GameObject, settings);
+			}
 
-            if (layerEnabled)
-            {
-                DrawLayer(rect, item.GameObject, settings.globalData.tagLayerLayout);
-            }
-        }
+			if (layerEnabled)
+			{
+				DrawLayer(rect, item.GameObject, settings);
+			}
+		}
 
-        protected override int CalculateGridCount()
-        {
-            if (isVertical || !bothShown)
-            {
-                return LABEL_GRID_SIZE;
-            }
+		protected override int CalculateGridCount()
+		{
+			if (isVertical || !bothShown)
+			{
+				return LABEL_GRID_SIZE;
+			}
 
-            return LABEL_GRID_SIZE * 2;
-        }
+			return LABEL_GRID_SIZE * 2;
+		}
 
-        protected override bool ValidateGrid()
-        {
-            if (GridCount < LABEL_GRID_SIZE) // Not big enough for either element
-            {
-                return false;
-            }
+		protected override bool ValidateGrid()
+		{
+			if (GridCount < LABEL_GRID_SIZE) // Not big enough for either element
+			{
+				return false;
+			}
 
-            if (GridCount < LABEL_GRID_SIZE * 2 && !isVertical && bothShown)
-            {
-                tagEnabled = !tagFirst;
-                layerEnabled = tagFirst;
-            }
+			if (GridCount < LABEL_GRID_SIZE * 2 && !isVertical && bothShown)
+			{
+				tagEnabled = !tagFirst;
+				layerEnabled = tagFirst;
+			}
 
-            return true;
-        }
+			return true;
+		}
 
-        // - Drawing elements
+		// - Drawing elements
 
-        private void DrawTag(Rect rect, GameObject instance, TagLayerLayout layout)
-        {
-            rect = GetInfoAreaRect(rect, true, layout);
-            DrawInstanceInfo(rect, instance.tag, instance, true);
-        }
+		private void DrawTag(Rect rect, GameObject instance, Settings settings)
+		{
+			rect = GetInfoAreaRect(rect, true, settings.globalData.tagLayerLayout);
+			if (settings.globalData.coloringTags)
+			{
+				var color = GUI.contentColor;
+				GUI.contentColor = GetHashColor(instance.tag, settings.globalData.coloringTagLayerS, settings.globalData.coloringTagLayerV);
+				DrawInstanceInfo(rect, instance.tag, instance, true);
+				GUI.contentColor = color;
+			}
+			else
+				DrawInstanceInfo(rect, instance.tag, instance, true);
+		}
 
-        private void DrawLayer(Rect rect, GameObject instance, TagLayerLayout layout)
-        {
-            rect = GetInfoAreaRect(rect, false, layout);
-            DrawInstanceInfo(rect, LayerMask.LayerToName(instance.layer), instance, false);
-        }
+		private void DrawLayer(Rect rect, GameObject instance, Settings settings)
+		{
+			rect = GetInfoAreaRect(rect, false, settings.globalData.tagLayerLayout);
+			var label = LayerMask.LayerToName(instance.layer);
+			if (settings.globalData.coloringLayers)
+			{
+				var color = GUI.contentColor;
+				GUI.contentColor = GetHashColor(label, settings.globalData.coloringTagLayerS, settings.globalData.coloringTagLayerV);
+				DrawInstanceInfo(rect, label, instance, false);
+				GUI.contentColor = color;
+			}
+			else
+				DrawInstanceInfo(rect, label, instance, false);
+		}
 
-        private void DrawInstanceInfo(Rect rect, string label, GameObject instance, bool isTag)
-        {
-            EditorGUI.LabelField(rect, label, (isVertical && bothShown) ? Style.TinyText : Style.SmallDropdown);
+		private Color GetHashColor(string label, float s, float v)
+		{
+			unchecked
+			{
+				int hash = 23;
+				foreach (char c in label)
+					hash = hash * 31 + c;
+				uint uhash = (uint)hash;
+				float h = (uhash * 0.61803398875f) % 1.0f;
+				return Color.HSVToRGB(h, s, v);
+			}
+		}
 
-            Event e = Event.current;
-            bool hasClicked = rect.Contains(e.mousePosition) && e.type == EventType.MouseDown;
+		private void DrawInstanceInfo(Rect rect, string label, GameObject instance, bool isTag)
+		{
+			if (!isTag || label != "Untagged")
+			{
+				GUI.Label(rect, new GUIContent(label, label), (isVertical && bothShown) ? Style.TinyText : Style.SmallDropdown);
+			}
 
-            if (!hasClicked)
-            {
-                return;
-            }
+			Event e = Event.current;
+			bool hasClicked = rect.Contains(e.mousePosition) && e.type == EventType.MouseDown;
 
-            // Create menu here 
+			if (!hasClicked)
+			{
+				return;
+			}
 
-            GenericMenu menu = isTag
-                ? CreateMenu(InternalEditorUtility.tags, AssignTag)
-                : CreateMenu(InternalEditorUtility.layers, AssignLayer);
+			// Create menu here 
 
-            GameObject[] selection = Selection.gameObjects;
-            if (selection.Length < 2)
-            {
-                Selection.SetActiveObjectWithContext(instance, null);
-            }
+			GenericMenu menu = isTag
+				? CreateMenu(InternalEditorUtility.tags, label, AssignTag)
+				: CreateMenu(InternalEditorUtility.layers, label, AssignLayer);
 
-            menu.ShowAsContext();
-            e.Use();
-        }
+			GameObject[] selection = Selection.gameObjects;
+			if (selection.Length < 2)
+			{
+				Selection.SetActiveObjectWithContext(instance, null);
+			}
 
-        // - Assignment
+			menu.ShowAsContext();
+			e.Use();
+		}
 
-        private void AssignTag(string tag)
-        {
-            Undo.RecordObjects(Selection.gameObjects, "Tag Updated");
+		// - Assignment
 
-            foreach (GameObject go in Selection.gameObjects)
-            {
-                go.tag = tag;
+		private void AssignTag(string tag)
+		{
+			Undo.RecordObjects(Selection.gameObjects, "Tag Updated");
 
-                if (Selection.gameObjects.Length == 1)
-                {
-                    Selection.SetActiveObjectWithContext(Selection.gameObjects[0], null);
-                }
-            }
-        }
+			foreach (GameObject go in Selection.gameObjects)
+			{
+				go.tag = tag;
 
-        private void AssignLayer(string layer)
-        {
-            Undo.RecordObjects(Selection.gameObjects, "Layer Updated");
+				if (Selection.gameObjects.Length == 1)
+				{
+					Selection.SetActiveObjectWithContext(Selection.gameObjects[0], null);
+				}
+			}
+		}
 
-            foreach (GameObject go in Selection.gameObjects)
-            {
-                int layerIndex = LayerMask.NameToLayer(layer);
-                go.layer = layerIndex;
+		private void AssignLayer(string layer)
+		{
+			Undo.RecordObjects(Selection.gameObjects, "Layer Updated");
 
-                if (setChildLayers)
-                {
-                    Undo.RecordObjects(Selection.gameObjects, "Layer Updated");
+			foreach (GameObject go in Selection.gameObjects)
+			{
+				int layerIndex = LayerMask.NameToLayer(layer);
+				go.layer = layerIndex;
 
-                    foreach (Transform child in go.transform)
-                    {
-                        child.gameObject.layer = layerIndex;
-                    }
-                }
+				if (setChildLayers)
+				{
+					Undo.RecordObjects(Selection.gameObjects, "Layer Updated");
 
-                if (Selection.gameObjects.Length == 1)
-                {
-                    Selection.SetActiveObjectWithContext(Selection.gameObjects[0], null);
-                }
-            }
-        }
+					foreach (Transform child in go.transform)
+					{
+						child.gameObject.layer = layerIndex;
+					}
+				}
 
-        // - Helpers
+				if (Selection.gameObjects.Length == 1)
+				{
+					Selection.SetActiveObjectWithContext(Selection.gameObjects[0], null);
+				}
+			}
+		}
 
-        private static GenericMenu CreateMenu(string[] items, Action<string> onSelect)
-        {
-            GenericMenu menu = new GenericMenu();
-            for (int i = 0; i < items.Length; i++)
-            {
-                string item = items[i];
-                menu.AddItem(new GUIContent(item), false, () => onSelect.Invoke(item));
-            }
+		// - Helpers
 
-            return menu;
-        }
+		private static GenericMenu CreateMenu(string[] items, string label, Action<string> onSelect)
+		{
+			GenericMenu menu = new GenericMenu();
+			for (int i = 0; i < items.Length; i++)
+			{
+				string item = items[i];
+				menu.AddItem(new GUIContent(item), label == item, () => onSelect.Invoke(item));
+			}
 
-        private Rect GetInfoAreaRect(Rect rect, bool isTag, TagLayerLayout layout)
-        {
-            if (!bothShown)
-            {
-                return rect;
-            }
+			return menu;
+		}
 
-            switch (layout)
-            {
-                // Horizontal
+		private Rect GetInfoAreaRect(Rect rect, bool isTag, TagLayerLayout layout)
+		{
+			if (!bothShown)
+			{
+				return rect;
+			}
 
-                // - Front Element
+			switch (layout)
+			{
+				// Horizontal
 
-                case TagLayerLayout.TagInFront when isTag:
-                case TagLayerLayout.LayerInFront when !isTag:
+				// - Front Element
 
-                    float halfWidth = rect.width * 0.5f;
-                    rect.width = halfWidth;
+				case TagLayerLayout.TagInFront when isTag:
+				case TagLayerLayout.LayerInFront when !isTag:
 
-                    break;
+					float halfWidth = rect.width * 0.5f;
+					rect.width = halfWidth;
 
-                // - Back Element
+					break;
 
-                case TagLayerLayout.TagInFront when !isTag:
-                case TagLayerLayout.LayerInFront when isTag:
+				// - Back Element
 
-                    halfWidth = rect.width * 0.5f;
-                    rect.width = halfWidth;
-                    rect.x += halfWidth;
+				case TagLayerLayout.TagInFront when !isTag:
+				case TagLayerLayout.LayerInFront when isTag:
 
-                    break;
+					halfWidth = rect.width * 0.5f;
+					rect.width = halfWidth;
+					rect.x += halfWidth;
 
-                // Vertical
+					break;
 
-                // - Top element
+				// Vertical
 
-                case TagLayerLayout.TagAbove when isTag:
-                case TagLayerLayout.LayerAbove when !isTag:
+				// - Top element
 
-                    float halfHeight = rect.height * 0.5f;
-                    rect.height = halfHeight;
+				case TagLayerLayout.TagAbove when isTag:
+				case TagLayerLayout.LayerAbove when !isTag:
 
-                    break;
+					float halfHeight = rect.height * 0.5f;
+					rect.height = halfHeight;
 
-                // - Lower element
+					break;
 
-                case TagLayerLayout.LayerAbove when isTag:
-                case TagLayerLayout.TagAbove when !isTag:
+				// - Lower element
 
-                    halfHeight = rect.height * 0.5f;
-                    rect.height = halfHeight;
-                    rect.y += halfHeight;
+				case TagLayerLayout.LayerAbove when isTag:
+				case TagLayerLayout.TagAbove when !isTag:
 
-                    break;
-            }
+					halfHeight = rect.height * 0.5f;
+					rect.height = halfHeight;
+					rect.y += halfHeight;
 
-            return rect;
-        }
-    }
+					break;
+			}
+
+			return rect;
+		}
+	}
 }
